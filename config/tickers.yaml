@@ -1,0 +1,53 @@
+tickers:
+  - ticker: PETR4
+    name: Petrobras
+    aliases: [Petrobras, Petrobrás, PETR4, PETR3]
+  - ticker: VALE3
+    name: Vale
+    aliases: [Vale, VALE3]
+  - ticker: PQDP11
+    name: Parque Dom Pedro
+    aliases: [Parque Dom pedro, shooping dom pedro, dom pedro campinas]
+  - ticker: KLBN11
+    name: Klabin
+    aliases: [Klabin, Celulose, KLBN4]
+  - ticker: CDI11
+    name: Sparta infra CDI
+    aliases: [CDI, Sparta CDI]
+  - ticker: CPFE3F
+    name: CPFL energia
+    aliases: [Companhia paulista de força e luz, CPFL energia, CPFL]
+  - ticker: BBSE3
+    name: bb seguridade
+    aliases: [banco do brasil seguros, bb seguridade, BBSE4]
+  - ticker: ISAE4F
+    name: Isa energia brasil
+    aliases: [ISAE3, Isa energiam distribuição energia, ISAE4]
+  - ticker: BBAS3F
+    name: Banco do brasil
+    aliases: [BB, banco do brasil SA, BBAS3]
+  - ticker: ECOR3F
+    name: EcoRodovias
+    aliases: [eco rodovias, ECOR3, BBSE4]
+  - ticker: TAEE11
+    name: Taesa
+    aliases: [Trasmissora alianca de energia eletrica, TAESA, taesa energia]
+  - ticker: MDIA3F
+    name: M.Dias branco
+    aliases: [Farinha de trigo, MDIA3, MDIA4, M dias branco]
+  - ticker: SAPR4F
+    name: Sanepar
+    aliases: [SAPR4F, Companhia de saneamento do parana, esgoto parana]
+  - ticker: NVDC34
+    name: Nvidea
+    aliases: [Nvidea, chip de IA, memória computador]
+  - ticker: AUPO11
+    name: BTG TEVA AUVP
+    aliases: [AUPO11, AUVP, raul sena]
+  - ticker: TSMC34
+    name: Taiwan semicondutores
+    aliases: [Nvidea, TSMC34, IA, silicio]
+  - ticker: BTC
+    name: Bitcoin
+    aliases: [bitcoin, BTC, BTCURL , BTCUSDT]
+
