@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>InfoMoney</title>
+    <link>https://www.infomoney.com.br</link>
+    <item>
+      <title>Petrobras anuncia dividendos extraordinários</title>
+      <link>https://www.infomoney.com.br/mercados/petrobras-dividendos/</link>
+      <pubDate>Mon, 21 Sep 2026 13:47:42 +0000</pubDate>
+      <description><![CDATA[<p>A <strong>Petrobras</strong> anunciou hoje o pagamento de dividendos.</p>]]></description>
+    </item>
+    <item>
+      <title>Item sem link deve ser descartado</title>
+      <pubDate>Mon, 21 Sep 2026 13:00:00 +0000</pubDate>
+      <description>Sem link.</description>
+    </item>
+  </channel>
+</rss>
