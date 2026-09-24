@@ -1,0 +1,7 @@
+feeds:
+  - name: InfoMoney
+    url: https://www.infomoney.com.br/feed/
+    perTicker: false
+  - name: Google News
+    url: https://news.google.com/rss/search?q={ticker}&hl=pt-BR&gl=BR&ceid=BR:pt-419
+    perTicker: true

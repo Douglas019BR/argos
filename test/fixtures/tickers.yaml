@@ -1,0 +1,7 @@
+tickers:
+  - ticker: PETR4
+    name: Petrobras
+    aliases: [Petrobras, Petrobrás, PETR4, PETR3]
+  - ticker: VALE3
+    name: Vale
+    aliases: [Vale, VALE3]

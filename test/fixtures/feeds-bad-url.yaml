@@ -1,0 +1,4 @@
+feeds:
+  - name: Broken
+    url: not-a-url
+    perTicker: false
