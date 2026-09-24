@@ -1,0 +1,8 @@
+services:
+  argos:
+    build: .
+    image: argos
+    env_file: .env
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
