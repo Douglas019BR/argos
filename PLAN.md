@@ -7,20 +7,20 @@ and push one WhatsApp message per matching article to a group.
 
 ## 1. Locked decisions
 
-| Topic | Decision |
-|---|---|
-| Language | **TypeScript only** (Node.js) |
-| WhatsApp | **Baileys** (personal account, persistent session) |
-| Group target | Group **JID** provided via env var |
-| News sources | Brazilian RSS feeds + Google News per-ticker search |
-| Article summary | **RSS `description` only** — never fetch the article page. If absent, send title only |
-| Message granularity | **One message per article link** |
-| Filter window | **5 hours** (slightly over the 4h cadence to avoid gaps) |
-| Dedup | **SQLite** (`better-sqlite3`) keyed by article link hash |
-| Scheduling | **4 hours**, in-process scheduler (long-running service) |
-| Runtime | **Docker** container kept up, with a **persistent volume** |
-| Ticker list | Provided by the user (hardcoded config file) |
-| Language of news | Portuguese (pt-BR feeds only) |
+| Topic               | Decision                                                                                      |
+| ------------------- | --------------------------------------------------------------------------------------------- |
+| Language            | **TypeScript only** (Node.js)                                                                 |
+| WhatsApp            | **Baileys** (personal account, persistent session)                                            |
+| Group target        | Group **JID** provided via env var                                                            |
+| News sources        | Brazilian RSS feeds + Google News per-ticker search                                           |
+| Article summary     | **RSS `description` only** — never fetch the article page. If absent, send title only         |
+| Message granularity | **One message per article link**                                                              |
+| Filter window       | **5 hours** (slightly over the 4h cadence to avoid gaps)                                      |
+| Dedup               | **SQLite** (`better-sqlite3`) keyed by article link hash                                      |
+| Scheduling          | **Every 4 hours, around the clock** (not restricted to B3 market hours), in-process scheduler |
+| Runtime             | **Docker** container kept up (`restart: unless-stopped`), with a **persistent volume**        |
+| Ticker list         | Provided by the user (hardcoded config file)                                                  |
+| Language of news    | Portuguese (pt-BR feeds only)                                                                 |
 
 ### Why these two matter
 
@@ -37,18 +37,23 @@ and push one WhatsApp message per matching article to a group.
 ```
 argos/
   config/
-    feeds.yaml          # RSS sources (name, url, optional per-ticker template)
+    feeds.yaml          # RSS sources (name, url, per-ticker flag)
     tickers.yaml        # ticker -> company name + aliases
   src/
-    index.ts            # bootstrap: load config, start scheduler
-    config.ts           # load + validate YAML/env with zod
-    feeds.ts            # fetch + parse RSS (rss-parser), normalize dates
-    matcher.ts          # accent/case-insensitive match article -> tickers
-    filter.ts           # 5h time-window filter
-    store.ts            # SQLite: has this link been sent?
-    format.ts           # build the WhatsApp message body
-    sender.ts           # Baileys: session, connect, send, (stay connected)
-    logger.ts           # pino logger
+    domain/             # Article, MatchedArticle, Ticker types
+    text/               # HTML stripping, normalization, truncation
+    time/               # feed date parsing
+    config/             # YAML + env loading/validation (zod), ConfigError
+    feeds/              # FeedSource, RssFeedSource, FeedSourceFactory, RssParser
+    pipeline/           # TickerMatcher, ArticleMessageFormatter,
+                        # SentArticleStore + SqliteSentArticleStore, NewsPipeline
+    notify/             # Notifier, ConsoleNotifier, BaileysNotifier,
+                        # WhatsApp connection + health checker
+    scheduler/          # node-cron wrapper with overlap guard
+    logging/            # pino logger
+    index.ts            # bootstrap: load config, run, start scheduler
+    health.ts           # WhatsApp session health probe
+  test/                 # unit tests + RSS fixtures
   data/                 # VOLUME (gitignored): baileys session + sent.db
   .env.example
   Dockerfile
@@ -57,6 +62,8 @@ argos/
   tsconfig.json
   PLAN.md
 ```
+
+The exact file-by-file layout is in [`CODE_SPEC.md`](CODE_SPEC.md) §2.
 
 ### Flow per run
 
@@ -76,21 +83,21 @@ load config
 
 ## 3. Tech stack
 
-| Concern | Package |
-|---|---|
-| Runtime | Node.js 20 (Docker `node:20-bookworm-slim`) |
-| Language | TypeScript |
-| Dev runner / build | `tsx` (dev), `tsc` (build) |
-| WhatsApp | `@whiskeysockets/baileys` |
-| QR display (first login) | `qrcode-terminal` |
-| RSS parsing | `rss-parser` |
-| SQLite | `better-sqlite3` |
-| Scheduling | `node-cron` |
-| Timezone | `luxon` (America/Sao_Paulo) |
-| Config validation | `zod` |
-| YAML parsing | `yaml` |
-| Logging | `pino` (Baileys also uses pino) |
-| HTML → text | `html-to-text` (for RSS descriptions) |
+| Concern                  | Package                                     |
+| ------------------------ | ------------------------------------------- |
+| Runtime                  | Node.js 20 (Docker `node:20-bookworm-slim`) |
+| Language                 | TypeScript                                  |
+| Dev runner / build       | `tsx` (dev), `tsc` (build)                  |
+| WhatsApp                 | `@whiskeysockets/baileys`                   |
+| QR display (first login) | `qrcode-terminal`                           |
+| RSS parsing              | `rss-parser`                                |
+| SQLite                   | `better-sqlite3`                            |
+| Scheduling               | `node-cron`                                 |
+| Timezone                 | `luxon` (America/Sao_Paulo)                 |
+| Config validation        | `zod`                                       |
+| YAML parsing             | `yaml`                                      |
+| Logging                  | `pino` (Baileys also uses pino)             |
+| HTML → text              | `html-to-text` (for RSS descriptions)       |
 
 ---
 
@@ -102,10 +109,10 @@ load config
 tickers:
   - ticker: PETR4
     name: Petrobras
-    aliases: ["Petrobras", "Petrobrás", "PETR4", "PETR3"]
+    aliases: ['Petrobras', 'Petrobrás', 'PETR4', 'PETR3']
   - ticker: VALE3
     name: Vale
-    aliases: ["Vale", "VALE3"]
+    aliases: ['Vale', 'VALE3']
 ```
 
 ### `config/feeds.yaml`
@@ -120,7 +127,7 @@ feeds:
     perTicker: false
   - name: Google News
     # {ticker} is replaced per configured ticker
-    url: "https://news.google.com/rss/search?q={ticker}&hl=pt-BR&gl=BR&ceid=BR:pt-419"
+    url: 'https://news.google.com/rss/search?q={ticker}&hl=pt-BR&gl=BR&ceid=BR:pt-419'
     perTicker: true
 ```
 
@@ -144,15 +151,15 @@ LOG_LEVEL=info
 CREATE TABLE IF NOT EXISTS sent_articles (
   link_hash   TEXT PRIMARY KEY,   -- sha256(link)
   link        TEXT NOT NULL,
-  title       TEXT,
-  tickers     TEXT,               -- comma-separated matched tickers
+  title       TEXT NOT NULL,
+  tickers     TEXT NOT NULL,      -- comma-separated matched tickers
   sent_at     TEXT NOT NULL       -- ISO-8601
 );
 
 CREATE INDEX IF NOT EXISTS idx_sent_at ON sent_articles(sent_at);
 ```
 
-Optionally prune rows older than N days at the end of each run (keep the table small).
+Rows older than 30 days are pruned at the end of each run.
 
 ---
 
@@ -183,10 +190,15 @@ Plain WhatsApp text, no emojis:
 
 ## 8. Scheduling & lifecycle
 
-- Long-running service. `node-cron` triggers the pipeline every 4h.
+- Long-running service. `node-cron` triggers the pipeline every 4h, around the
+  clock while the process is up — news does not follow B3 market hours, so there
+  is no market-hours gating.
+- Runs once on boot, then on the schedule.
 - Baileys connects once at startup, stays connected, sends on each run.
 - On first start, print the QR code to the logs (`qrcode-terminal`). Scan once;
   the session persists in the volume afterward.
+- A `health.ts` probe reports whether the session is still valid (`connected`,
+  `needs-auth`, `no-session`, `unknown`) so re-authentication is predictable.
 - Graceful shutdown on SIGTERM/SIGINT (close socket, flush logger).
 
 ---
@@ -231,7 +243,7 @@ the sender (step 7 needs the QR/session dance).
 
 ## 11. Risks / notes
 
-- **Ban risk:** automating a *personal* WhatsApp account with Baileys is against
+- **Ban risk:** automating a _personal_ WhatsApp account with Baileys is against
   WhatsApp ToS and can get the number banned. Keep message volume sane and add a
   small delay between sends. Consider a dedicated number.
 - **Investing.com feed:** items sometimes lack `description` and its `pubDate` has
