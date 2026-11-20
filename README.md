@@ -1,14 +1,13 @@
 # Argos
 
 The giant with multiple eyes. Watches a fixed list of Brazilian stocks across
-RSS feeds and pushes one WhatsApp message per matching article to a group.
+RSS feeds and pushes WhatsApp messages.
 
 - Sources: InfoMoney, Investing.com BR, and a Google News search per ticker.
 - Matching: accent/case-insensitive aliases with word boundaries (`PETR4`, `Petrobras`, ...).
 - Delivery: one message per article link, to a WhatsApp group via Baileys.
-- No duplicates: sent links are recorded in SQLite.
-- Runs every 4 hours, around the clock while the process is up — not restricted
-  to B3 market hours (news does not follow the market schedule).
+- No duplicates: sent links are recorded in database.
+- Runs every 4 hours, around the clock while the process is up
 
 ---
 
@@ -210,6 +209,10 @@ Investing.com), the summary block is omitted.
 | `npm run typecheck`     | `tsc --noEmit`                        |
 | `npm run lint`          | ESLint                                |
 | `npm run format`        | Prettier write                        |
+| `npm run format:check`  | Prettier check                        |
+| `npm run spellcheck`    | cspell (English + pt-BR)              |
+| `npm run secrets:check` | Secret-pattern scan of repository     |
+| `npm run verify`        | All checks above, plus tests          |
 
 ---
 
