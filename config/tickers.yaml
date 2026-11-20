@@ -11,9 +11,6 @@ tickers:
   - ticker: KLBN11
     name: Klabin
     aliases: [Klabin, Celulose, KLBN4]
-  - ticker: CDI11
-    name: Sparta infra CDI
-    aliases: [CDI, Sparta CDI]
   - ticker: CPFE3F
     name: CPFL energia
     aliases: [Companhia paulista de força e luz, CPFL energia, CPFL]
@@ -49,5 +46,4 @@ tickers:
     aliases: [Nvidea, TSMC34, IA, silicio]
   - ticker: BTC
     name: Bitcoin
-    aliases: [bitcoin, BTC, BTCURL , BTCUSDT]
-
+    aliases: [bitcoin, BTC, BTCURL, BTCUSDT]
