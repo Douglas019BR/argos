@@ -1,5 +1,7 @@
 # Argos
 
+![Argos panoptis](assets/argos-panoptis.webp)
+
 The giant with multiple eyes. Watches a fixed list of Brazilian stocks across
 RSS feeds and pushes WhatsApp messages.
 
