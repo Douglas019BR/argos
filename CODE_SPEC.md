@@ -352,6 +352,7 @@ export class ArticleMessageFormatter {
   constructor(private readonly summaryMaxChars = 300) {}
 
   format(article: Article, tickers: Ticker[]): string;
+  formatForTicker(articles: Article[], ticker: Ticker): string;
 }
 ```
 
@@ -364,7 +365,14 @@ Output (plain text, no emojis):
 <first N chars of description, omitted when empty>
 
 <link>
+
+---
+
+<another title>
+<another link>
 ```
+
+`formatForTicker` repeats the article body under one stock header, joined by `---`.
 
 ---
 
@@ -444,9 +452,13 @@ export class NewsPipeline {
 2. Keep items with `publishedAt >= now - windowHours`.
 3. `store.filterUnseen(...)`.
 4. `matcher.match(...)` each; drop unmatched.
-5. `formatter.format(...)` each → send via `notifier.send(groupJid, msg)`.
-6. `store.markSent(...)` for the sent ones.
-7. `store.prune(30)`; return counts.
+5. Group matched articles by ticker; split groups over 10 articles.
+6. `formatter.formatForTicker(...)` per chunk → `notifier.send(groupJid, msg)`.
+7. `store.markSent(...)` for articles in successful sends.
+8. `store.prune(30)`; return counts.
+
+If one article matches several stocks and one of their sends fails, the successful
+send marks the article sent, so it is not retried for the failed stock.
 
 The pipeline owns orchestration only — no HTTP, no SQL, no WhatsApp specifics.
 
@@ -536,7 +548,7 @@ constructor injection.
 | `text/normalize.ts`       | pure                       | accents, case, HTML stripping, truncation                  |
 | `time/parse-date.ts`      | pure                       | RFC-822, Investing `yyyy-MM-dd HH:mm:ss`, invalid → `null` |
 | `TickerMatcher`           | pure                       | word-boundary hit/miss, accents, multi-ticker, case        |
-| `ArticleMessageFormatter` | pure                       | with/without description, multi-ticker header              |
+| `ArticleMessageFormatter` | pure                       | with/without description, multi-article stock grouping     |
 | `ConfigLoader`            | pure (given fixtures)      | valid load, missing env, bad YAML → `ConfigError`          |
 | `RssFeedSource`           | fake parser / fixture XML  | maps fields, drops bad dates, returns `[]` on error        |
 | `FeedSourceFactory`       | pure                       | `perTicker` expansion, `{ticker}` substitution             |

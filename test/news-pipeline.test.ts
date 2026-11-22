@@ -13,6 +13,7 @@ import { TickerMatcher } from '../src/pipeline/ticker-matcher.js';
 const NOW = new Date('2026-09-21T12:00:00.000Z');
 const logger = createLogger('silent');
 const petr: Ticker = { ticker: 'PETR4', name: 'Petrobras', aliases: ['Petrobras', 'PETR4'] };
+const vale: Ticker = { ticker: 'VALE3', name: 'Vale', aliases: ['Vale', 'VALE3'] };
 
 class StubFeedSource implements FeedSource {
   constructor(
@@ -70,18 +71,25 @@ function article(overrides: Partial<Article> = {}): Article {
   };
 }
 
-function createPipeline(sources: FeedSource[], store = new InMemorySentArticleStore()) {
+function createPipeline(
+  sources: FeedSource[],
+  store = new InMemorySentArticleStore(),
+  options: { tickers?: Ticker[]; maxArticlesPerMessage?: number } = {},
+) {
   const notifier = new RecordingNotifier();
   const pipeline = new NewsPipeline({
     sources,
     store,
-    matcher: new TickerMatcher([petr]),
+    matcher: new TickerMatcher(options.tickers ?? [petr]),
     formatter: new ArticleMessageFormatter(),
     notifier,
     groupJid: 'group@g.us',
     windowHours: 5,
     now: () => NOW,
     logger,
+    ...(options.maxArticlesPerMessage === undefined
+      ? {}
+      : { maxArticlesPerMessage: options.maxArticlesPerMessage }),
   });
   return { pipeline, notifier, store };
 }
@@ -95,7 +103,7 @@ describe('NewsPipeline', () => {
     expect(notifier.messages).toHaveLength(1);
     expect(notifier.messages[0]?.to).toBe('group@g.us');
     expect(notifier.messages[0]?.message).toContain('[PETR4 · Petrobras]');
-    expect(result).toEqual({ fetched: 1, inWindow: 1, matched: 1, sent: 1 });
+    expect(result).toEqual({ fetched: 1, inWindow: 1, matched: 1, sent: 1, messages: 1 });
   });
 
   it('drops articles older than the window', async () => {
@@ -161,5 +169,131 @@ describe('NewsPipeline', () => {
 
     expect(result.sent).toBe(0);
     expect(store.filterUnseen([article()])).toHaveLength(1);
+  });
+
+  it('sends one message for several articles of the same stock', async () => {
+    const { pipeline, notifier } = createPipeline([
+      new StubFeedSource('test', [
+        article({ link: 'https://example.com/1' }),
+        article({ link: 'https://example.com/2', title: 'Petrobras sobe' }),
+      ]),
+    ]);
+
+    const result = await pipeline.run();
+
+    expect(notifier.messages).toHaveLength(1);
+    expect(notifier.messages[0]?.message).toContain('https://example.com/1');
+    expect(notifier.messages[0]?.message).toContain('https://example.com/2');
+    expect(result).toMatchObject({ sent: 2, messages: 1 });
+  });
+
+  it('sends a separate message for each stock an article matches', async () => {
+    const { pipeline, notifier } = createPipeline(
+      [
+        new StubFeedSource('test', [
+          article({
+            title: 'Petrobras e Vale sobem',
+            description: '',
+            link: 'https://example.com/3',
+          }),
+        ]),
+      ],
+      new InMemorySentArticleStore(),
+      { tickers: [petr, vale] },
+    );
+
+    const result = await pipeline.run();
+
+    expect(notifier.messages).toHaveLength(2);
+    expect(notifier.messages[0]?.message).toContain('[PETR4 · Petrobras]');
+    expect(notifier.messages[1]?.message).toContain('[VALE3 · Vale]');
+    expect(result).toMatchObject({ sent: 1, messages: 2 });
+  });
+
+  it('splits a large stock group into several messages', async () => {
+    const { pipeline, notifier } = createPipeline(
+      [
+        new StubFeedSource('test', [
+          article({ link: 'https://example.com/1' }),
+          article({ link: 'https://example.com/2' }),
+          article({ link: 'https://example.com/3' }),
+        ]),
+      ],
+      new InMemorySentArticleStore(),
+      { maxArticlesPerMessage: 2 },
+    );
+
+    const result = await pipeline.run();
+
+    expect(notifier.messages).toHaveLength(2);
+    expect(result).toMatchObject({ sent: 3, messages: 2 });
+  });
+
+  it('does not mark articles from a failed stock group as sent', async () => {
+    const store = new InMemorySentArticleStore();
+    const notifier = new RecordingNotifier();
+    notifier.failOn = '[VALE3 · Vale]';
+    const valeArticle: Article = {
+      ...article(),
+      link: 'https://example.com/vale',
+      title: 'Vale sobe',
+    };
+    const pipeline = new NewsPipeline({
+      sources: [new StubFeedSource('test', [article(), valeArticle])],
+      store,
+      matcher: new TickerMatcher([petr, vale]),
+      formatter: new ArticleMessageFormatter(),
+      notifier,
+      groupJid: 'group@g.us',
+      windowHours: 5,
+      now: () => NOW,
+      logger,
+    });
+
+    await pipeline.run();
+
+    expect(notifier.messages).toHaveLength(1);
+    expect(store.filterUnseen([valeArticle])).toHaveLength(1);
+  });
+
+  it('marks a shared article sent when one of its stock messages succeeds', async () => {
+    const store = new InMemorySentArticleStore();
+    const notifier = new RecordingNotifier();
+    notifier.failOn = '[VALE3 · Vale]';
+    const shared = article({ title: 'Petrobras e Vale sobem', description: '' });
+    const pipeline = new NewsPipeline({
+      sources: [new StubFeedSource('test', [shared])],
+      store,
+      matcher: new TickerMatcher([petr, vale]),
+      formatter: new ArticleMessageFormatter(),
+      notifier,
+      groupJid: 'group@g.us',
+      windowHours: 5,
+      now: () => NOW,
+      logger,
+    });
+
+    await pipeline.run();
+
+    expect(notifier.messages).toHaveLength(1);
+    expect(store.filterUnseen([shared])).toHaveLength(0);
+  });
+
+  it('treats a non-positive message size as one article per message', async () => {
+    const { pipeline, notifier } = createPipeline(
+      [
+        new StubFeedSource('test', [
+          article({ link: 'https://example.com/1' }),
+          article({ link: 'https://example.com/2' }),
+        ]),
+      ],
+      new InMemorySentArticleStore(),
+      { maxArticlesPerMessage: 0 },
+    );
+
+    const result = await pipeline.run();
+
+    expect(notifier.messages).toHaveLength(2);
+    expect(result.messages).toBe(2);
   });
 });

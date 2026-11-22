@@ -1,4 +1,5 @@
 import type { Article, MatchedArticle } from '../domain/article.js';
+import type { Ticker } from '../domain/ticker.js';
 import type { FeedSource } from '../feeds/feed-source.js';
 import type { Logger } from '../logging/logger.js';
 import type { Notifier } from '../notify/notifier.js';
@@ -8,6 +9,12 @@ import type { TickerMatcher } from './ticker-matcher.js';
 
 const MILLIS_PER_HOUR = 3_600_000;
 const PRUNE_DAYS = 30;
+const DEFAULT_MAX_ARTICLES_PER_MESSAGE = 10;
+
+interface TickerGroup {
+  ticker: Ticker;
+  articles: MatchedArticle[];
+}
 
 export interface PipelineDeps {
   sources: FeedSource[];
@@ -19,6 +26,7 @@ export interface PipelineDeps {
   windowHours: number;
   now: () => Date;
   logger: Logger;
+  maxArticlesPerMessage?: number;
 }
 
 export interface PipelineResult {
@@ -26,11 +34,12 @@ export interface PipelineResult {
   inWindow: number;
   matched: number;
   sent: number;
+  messages: number;
 }
 
 /**
- * Orchestrates one run: fetch, filter by window, dedupe, match, format and send.
- * Owns no transport or persistence details — only the sequence.
+ * Orchestrates one run: fetch, filter by window, dedupe, match, group by stock
+ * and send one message per stock (splitting very large groups).
  */
 export class NewsPipeline {
   constructor(private readonly deps: PipelineDeps) {}
@@ -40,7 +49,7 @@ export class NewsPipeline {
     const inWindow = this.withinWindow(fetched);
     const unseen = this.deps.store.filterUnseen(inWindow);
     const matched = this.matchTickers(unseen);
-    const sent = await this.send(matched);
+    const { sent, messages } = await this.send(this.groupByTicker(matched));
 
     this.deps.store.markSent(sent);
     this.deps.store.prune(PRUNE_DAYS);
@@ -50,6 +59,7 @@ export class NewsPipeline {
       inWindow: inWindow.length,
       matched: matched.length,
       sent: sent.length,
+      messages,
     };
   }
 
@@ -69,20 +79,54 @@ export class NewsPipeline {
       .filter((article) => article.tickers.length > 0);
   }
 
-  private async send(articles: MatchedArticle[]): Promise<MatchedArticle[]> {
-    const sent: MatchedArticle[] = [];
+  private groupByTicker(articles: MatchedArticle[]): TickerGroup[] {
+    const groups = new Map<string, TickerGroup>();
 
     for (const article of articles) {
-      const message = this.deps.formatter.format(article, article.tickers);
-
-      try {
-        await this.deps.notifier.send(this.deps.groupJid, message);
-        sent.push(article);
-      } catch (error) {
-        this.deps.logger.warn({ err: error, link: article.link }, 'Failed to send article');
+      for (const ticker of article.tickers) {
+        const group = groups.get(ticker.ticker) ?? { ticker, articles: [] };
+        group.articles.push(article);
+        groups.set(ticker.ticker, group);
       }
     }
 
-    return sent;
+    return [...groups.values()];
+  }
+
+  private chunk(articles: MatchedArticle[]): MatchedArticle[][] {
+    const size = Math.max(1, this.deps.maxArticlesPerMessage ?? DEFAULT_MAX_ARTICLES_PER_MESSAGE);
+    const chunks: MatchedArticle[][] = [];
+
+    for (let index = 0; index < articles.length; index += size) {
+      chunks.push(articles.slice(index, index + size));
+    }
+
+    return chunks;
+  }
+
+  private async send(groups: TickerGroup[]): Promise<{ sent: MatchedArticle[]; messages: number }> {
+    const sent = new Map<string, MatchedArticle>();
+    let messages = 0;
+
+    for (const group of groups) {
+      for (const chunk of this.chunk(group.articles)) {
+        const message = this.deps.formatter.formatForTicker(chunk, group.ticker);
+
+        try {
+          await this.deps.notifier.send(this.deps.groupJid, message);
+          messages += 1;
+          for (const article of chunk) {
+            sent.set(article.link, article);
+          }
+        } catch (error) {
+          this.deps.logger.warn(
+            { err: error, ticker: group.ticker.ticker, links: chunk.map((a) => a.link) },
+            'Failed to send articles',
+          );
+        }
+      }
+    }
+
+    return { sent: [...sent.values()], messages };
   }
 }

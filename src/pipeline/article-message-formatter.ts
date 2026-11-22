@@ -3,18 +3,26 @@ import type { Ticker } from '../domain/ticker.js';
 import { truncate } from '../text/normalize.js';
 
 const DEFAULT_SUMMARY_MAX_CHARS = 300;
+const ARTICLE_SEPARATOR = '\n\n---\n\n';
 
 /**
- * Builds the WhatsApp message body for a matched article.
+ * Builds the WhatsApp message body for one or more articles of a single stock.
  */
 export class ArticleMessageFormatter {
   constructor(private readonly summaryMaxChars = DEFAULT_SUMMARY_MAX_CHARS) {}
 
   format(article: Article, tickers: Ticker[]): string {
-    const header = `${this.formatHeader(tickers)}\n${article.title}`;
-    const summary = this.formatSummary(article.description);
+    return `${this.formatHeader(tickers)}\n${this.formatArticle(article)}`;
+  }
 
-    return [header, summary, article.link].filter((block) => block !== '').join('\n\n');
+  formatForTicker(articles: Article[], ticker: Ticker): string {
+    const bodies = articles.map((article) => this.formatArticle(article));
+    return `${this.formatHeader([ticker])}\n${bodies.join(ARTICLE_SEPARATOR)}`;
+  }
+
+  private formatArticle(article: Article): string {
+    const summary = this.formatSummary(article.description);
+    return [article.title, summary, article.link].filter((block) => block !== '').join('\n\n');
   }
 
   private formatHeader(tickers: Ticker[]): string {

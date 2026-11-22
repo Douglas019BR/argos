@@ -50,4 +50,19 @@ describe('ArticleMessageFormatter', () => {
     expect(message).toContain('abcdefghij…');
     expect(message).not.toContain('klmno');
   });
+
+  it('lists several articles under a single stock header', () => {
+    const formatter = new ArticleMessageFormatter();
+    const message = formatter.formatForTicker(
+      [
+        article(),
+        article({ title: 'Petrobras sobe', link: 'https://example.com/b', description: '' }),
+      ],
+      petr,
+    );
+
+    expect(message).toBe(
+      '[PETR4 · Petrobras]\nPetrobras anuncia dividendos\n\nA companhia aprovou o pagamento.\n\nhttps://example.com/a\n\n---\n\nPetrobras sobe\n\nhttps://example.com/b',
+    );
+  });
 });

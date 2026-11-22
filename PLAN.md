@@ -14,13 +14,16 @@ and push one WhatsApp message per matching article to a group.
 | Group target        | Group **JID** provided via env var                                                            |
 | News sources        | Brazilian RSS feeds + Google News per-ticker search                                           |
 | Article summary     | **RSS `description` only** — never fetch the article page. If absent, send title only         |
-| Message granularity | **One message per article link**                                                              |
+| Message granularity | **One message per stock per run** (articles grouped, split after 10)                          |
 | Filter window       | **5 hours** (slightly over the 4h cadence to avoid gaps)                                      |
 | Dedup               | **SQLite** (`better-sqlite3`) keyed by article link hash                                      |
 | Scheduling          | **Every 4 hours, around the clock** (not restricted to B3 market hours), in-process scheduler |
 | Runtime             | **Docker** container kept up (`restart: unless-stopped`), with a **persistent volume**        |
 | Ticker list         | Provided by the user (hardcoded config file)                                                  |
 | Language of news    | Portuguese (pt-BR feeds only)                                                                 |
+
+The current deployment overrides the defaults above with `CRON=*/15 * * * *` and
+`WINDOW_HOURS=1`.
 
 ### Why these two matter
 
@@ -74,7 +77,7 @@ load config
   -> drop items older than 5h
   -> drop items already in SQLite (by link hash)
   -> match ticker(s) via aliases against title + description
-  -> build one message per article link
+  -> group by stock and build one message per stock
   -> send via Baileys to GROUP_JID
   -> record sent link in SQLite
 ```
@@ -169,11 +172,11 @@ Rows older than 30 days are pruned at the end of each run.
 - For each ticker alias, match on **word boundaries** to avoid false positives
   (e.g. `VALE` should not match `VALEU`, `PETR` should not match `PETRÓLEO` unless aliased).
 - Match against `title + " " + description`.
-- An article can match multiple tickers; a single message lists all matched tickers.
+- An article can match multiple tickers; it appears in each matching stock's message.
 
 ---
 
-## 7. Message format (one per link)
+## 7. Message format (one per stock)
 
 Plain WhatsApp text, no emojis:
 
@@ -184,7 +187,14 @@ Plain WhatsApp text, no emojis:
 <first ~300 chars of RSS description, HTML stripped — omitted if empty>
 
 <article link>
+
+---
+
+<another article title>
+<another link>
 ```
+
+Groups larger than 10 articles are split into extra messages for that stock.
 
 ---
 

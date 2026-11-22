@@ -7,9 +7,9 @@ RSS feeds and pushes WhatsApp messages.
 
 - Sources: InfoMoney, Investing.com BR, and a Google News search per ticker.
 - Matching: accent/case-insensitive aliases with word boundaries (`PETR4`, `Petrobras`, ...).
-- Delivery: one message per article link, to a WhatsApp group via Baileys.
+- Delivery: one message per stock per run, grouping that stock's articles.
 - No duplicates: sent links are recorded in database.
-- Runs every 4 hours, around the clock while the process is up
+- Runs on a configurable cron (every 15 minutes in the current deployment).
 
 ---
 
@@ -22,12 +22,14 @@ load config
   -> drop items older than WINDOW_HOURS (default 5)
   -> drop items already sent (SQLite, keyed by link hash)
   -> match tickers via aliases against title + description
-  -> format one message per article
+  -> group articles by stock, format one message per stock
   -> send to WHATSAPP_GROUP_JID
   -> record sent links
 ```
 
-A run happens once at startup and then on the cron schedule.
+A run happens once at startup and then on the cron schedule. Defaults are a 5-hour
+window and a 4-hour cron; the current deployment overrides them to 1 hour and 15
+minutes in `.env`.
 
 ---
 
@@ -182,6 +184,8 @@ human needs to relink the account.
 
 ## Message format
 
+One message is sent per stock per run. Articles for that stock are separated by `---`:
+
 ```
 [PETR4 · Petrobras]
 <article title>
@@ -189,10 +193,18 @@ human needs to relink the account.
 <summary from the RSS description, when present>
 
 <article link>
+
+---
+
+<another article title>
+
+<another link>
 ```
 
-No emojis, plain WhatsApp text. When the RSS item has no description (common on
-Investing.com), the summary block is omitted.
+Groups larger than 10 articles are split into additional messages for that stock.
+An article matching multiple stocks appears in each stock's message. No emojis,
+plain WhatsApp text. When the RSS item has no description (common on Investing.com),
+the summary block is omitted.
 
 ---
 
