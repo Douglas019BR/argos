@@ -255,6 +255,14 @@ Design and conventions are documented in [`PLAN.md`](PLAN.md) and
 
 ---
 
+## Contributing and security
+
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md). Report security
+issues privately as described in [SECURITY.md](SECURITY.md). Release notes are in
+[CHANGELOG.md](CHANGELOG.md).
+
+---
+
 ## Risks
 
 - **Account ban.** Automating a personal WhatsApp account with Baileys is
@@ -263,3 +271,9 @@ Design and conventions are documented in [`PLAN.md`](PLAN.md) and
 - **Google News links** are redirect URLs (`news.google.com/rss/articles/...`).
 - **Feed drift.** Feeds change or break. A failing feed is logged and skipped; it
   never aborts the run.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
