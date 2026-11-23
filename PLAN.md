@@ -76,7 +76,8 @@ load config
   -> normalize (title, link, description->plaintext, publishedAt, source)
   -> drop items older than 5h
   -> drop items already in SQLite (by link hash)
-  -> match ticker(s) via aliases against title + description
+  -> drop duplicate links returned by several feeds
+  -> match the first ticker whose alias appears in title + description
   -> group by stock and build one message per stock
   -> send via Baileys to GROUP_JID
   -> record sent link in SQLite
@@ -172,7 +173,7 @@ Rows older than 30 days are pruned at the end of each run.
 - For each ticker alias, match on **word boundaries** to avoid false positives
   (e.g. `VALE` should not match `VALEU`, `PETR` should not match `PETRÓLEO` unless aliased).
 - Match against `title + " " + description`.
-- An article can match multiple tickers; it appears in each matching stock's message.
+- An article can match multiple tickers; the first match in config order wins.
 
 ---
 

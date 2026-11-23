@@ -31,6 +31,7 @@ export interface PipelineDeps {
 
 export interface PipelineResult {
   fetched: number;
+  unique: number;
   inWindow: number;
   matched: number;
   sent: number;
@@ -47,7 +48,8 @@ export class NewsPipeline {
   async run(): Promise<PipelineResult> {
     const fetched = await this.fetchAll();
     const inWindow = this.withinWindow(fetched);
-    const unseen = this.deps.store.filterUnseen(inWindow);
+    const unique = this.dedupeByLink(inWindow);
+    const unseen = this.deps.store.filterUnseen(unique);
     const matched = this.matchTickers(unseen);
     const { sent, messages } = await this.send(this.groupByTicker(matched));
 
@@ -56,6 +58,7 @@ export class NewsPipeline {
 
     return {
       fetched: fetched.length,
+      unique: unique.length,
       inWindow: inWindow.length,
       matched: matched.length,
       sent: sent.length,
@@ -68,15 +71,29 @@ export class NewsPipeline {
     return results.flat();
   }
 
+  private dedupeByLink(articles: Article[]): Article[] {
+    const links = new Set<string>();
+
+    return articles.filter((article) => {
+      if (links.has(article.link)) {
+        return false;
+      }
+
+      links.add(article.link);
+      return true;
+    });
+  }
+
   private withinWindow(articles: Article[]): Article[] {
     const cutoff = this.deps.now().getTime() - this.deps.windowHours * MILLIS_PER_HOUR;
     return articles.filter((article) => article.publishedAt.getTime() >= cutoff);
   }
 
   private matchTickers(articles: Article[]): MatchedArticle[] {
-    return articles
-      .map((article) => ({ ...article, tickers: this.deps.matcher.match(article) }))
-      .filter((article) => article.tickers.length > 0);
+    return articles.flatMap((article) => {
+      const ticker = this.deps.matcher.matchFirst(article);
+      return ticker === null ? [] : [{ ...article, tickers: [ticker] }];
+    });
   }
 
   private groupByTicker(articles: MatchedArticle[]): TickerGroup[] {
