@@ -334,6 +334,7 @@ export class TickerMatcher {
   constructor(tickers: Ticker[]);
 
   match(article: Article): Ticker[];
+  matchFirst(article: Article): Ticker | null;
 }
 ```
 
@@ -449,16 +450,14 @@ export class NewsPipeline {
 `run()` steps:
 
 1. `fetchArticles()` from every source in parallel (`Promise.all`), flatten.
-2. Keep items with `publishedAt >= now - windowHours`.
-3. `store.filterUnseen(...)`.
-4. `matcher.match(...)` each; drop unmatched.
-5. Group matched articles by ticker; split groups over 10 articles.
-6. `formatter.formatForTicker(...)` per chunk → `notifier.send(groupJid, msg)`.
-7. `store.markSent(...)` for articles in successful sends.
-8. `store.prune(30)`; return counts.
-
-If one article matches several stocks and one of their sends fails, the successful
-send marks the article sent, so it is not retried for the failed stock.
+2. Drop repeated links (per-ticker feeds can return the same article).
+3. Keep items with `publishedAt >= now - windowHours`.
+4. `store.filterUnseen(...)`.
+5. `matcher.matchFirst(...)` each; drop unmatched.
+6. Group articles by ticker; split groups over 10 articles.
+7. `formatter.formatForTicker(...)` per chunk → `notifier.send(groupJid, msg)`.
+8. `store.markSent(...)` for articles in successful sends.
+9. `store.prune(30)`; return counts.
 
 The pipeline owns orchestration only — no HTTP, no SQL, no WhatsApp specifics.
 

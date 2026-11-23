@@ -5,6 +5,11 @@ Keep a Changelog.
 
 ## [Unreleased]
 
+### Fixed
+
+- Articles returned by multiple per-ticker feeds are no longer duplicated inside a message.
+- Articles matching several tickers are assigned to the first matching stock only.
+
 ## [0.1.0] - 2026-11-22
 
 ### Added

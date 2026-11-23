@@ -59,4 +59,12 @@ describe('TickerMatcher', () => {
   it('returns an empty list when nothing matches', () => {
     expect(matcher.match(article('Notícia sobre tecnologia'))).toEqual([]);
   });
+
+  it('returns the first matching ticker in config order', () => {
+    expect(matcher.matchFirst(article('Petrobras e Vale sobem'))?.ticker).toBe('PETR4');
+  });
+
+  it('returns null when nothing matches', () => {
+    expect(matcher.matchFirst(article('Notícia sobre tecnologia'))).toBeNull();
+  });
 });

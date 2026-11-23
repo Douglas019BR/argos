@@ -103,7 +103,14 @@ describe('NewsPipeline', () => {
     expect(notifier.messages).toHaveLength(1);
     expect(notifier.messages[0]?.to).toBe('group@g.us');
     expect(notifier.messages[0]?.message).toContain('[PETR4 · Petrobras]');
-    expect(result).toEqual({ fetched: 1, inWindow: 1, matched: 1, sent: 1, messages: 1 });
+    expect(result).toEqual({
+      fetched: 1,
+      unique: 1,
+      inWindow: 1,
+      matched: 1,
+      sent: 1,
+      messages: 1,
+    });
   });
 
   it('drops articles older than the window', async () => {
@@ -187,7 +194,7 @@ describe('NewsPipeline', () => {
     expect(result).toMatchObject({ sent: 2, messages: 1 });
   });
 
-  it('sends a separate message for each stock an article matches', async () => {
+  it('sends a multi-stock article only to the first matching stock', async () => {
     const { pipeline, notifier } = createPipeline(
       [
         new StubFeedSource('test', [
@@ -204,10 +211,10 @@ describe('NewsPipeline', () => {
 
     const result = await pipeline.run();
 
-    expect(notifier.messages).toHaveLength(2);
+    expect(notifier.messages).toHaveLength(1);
     expect(notifier.messages[0]?.message).toContain('[PETR4 · Petrobras]');
-    expect(notifier.messages[1]?.message).toContain('[VALE3 · Vale]');
-    expect(result).toMatchObject({ sent: 1, messages: 2 });
+    expect(notifier.messages[0]?.message).not.toContain('[VALE3 · Vale]');
+    expect(result).toMatchObject({ sent: 1, messages: 1 });
   });
 
   it('splits a large stock group into several messages', async () => {
@@ -256,27 +263,35 @@ describe('NewsPipeline', () => {
     expect(store.filterUnseen([valeArticle])).toHaveLength(1);
   });
 
-  it('marks a shared article sent when one of its stock messages succeeds', async () => {
-    const store = new InMemorySentArticleStore();
-    const notifier = new RecordingNotifier();
-    notifier.failOn = '[VALE3 · Vale]';
-    const shared = article({ title: 'Petrobras e Vale sobem', description: '' });
-    const pipeline = new NewsPipeline({
-      sources: [new StubFeedSource('test', [shared])],
-      store,
-      matcher: new TickerMatcher([petr, vale]),
-      formatter: new ArticleMessageFormatter(),
-      notifier,
-      groupJid: 'group@g.us',
-      windowHours: 5,
-      now: () => NOW,
-      logger,
-    });
+  it('sends an article returned by several feeds only once', async () => {
+    const duplicate = article({ link: 'https://example.com/shared' });
+    const { pipeline, notifier } = createPipeline([
+      new StubFeedSource('a', [duplicate]),
+      new StubFeedSource('b', [{ ...duplicate }]),
+    ]);
 
-    await pipeline.run();
+    const result = await pipeline.run();
 
     expect(notifier.messages).toHaveLength(1);
-    expect(store.filterUnseen([shared])).toHaveLength(0);
+    expect(notifier.messages[0]?.message.match(/https:\/\/example\.com\/shared/g)).toHaveLength(1);
+    expect(result).toMatchObject({ fetched: 2, unique: 1, sent: 1, messages: 1 });
+  });
+
+  it('keeps the in-window copy when an earlier duplicate is stale', async () => {
+    const stale = article({
+      link: 'https://example.com/copy',
+      publishedAt: new Date('2026-09-21T06:00:00.000Z'),
+    });
+    const fresh = { ...stale, publishedAt: new Date('2026-09-21T11:00:00.000Z') };
+    const { pipeline, notifier } = createPipeline([
+      new StubFeedSource('a', [stale]),
+      new StubFeedSource('b', [fresh]),
+    ]);
+
+    const result = await pipeline.run();
+
+    expect(notifier.messages).toHaveLength(1);
+    expect(result).toMatchObject({ fetched: 2, inWindow: 1, unique: 1, sent: 1 });
   });
 
   it('treats a non-positive message size as one article per message', async () => {

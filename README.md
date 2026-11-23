@@ -19,9 +19,10 @@ RSS feeds and pushes WhatsApp messages.
 load config
   -> for each feed: fetch + parse RSS
   -> normalize (title, link, description -> plain text, publishedAt, source)
+  -> drop duplicate links returned by several feeds
   -> drop items older than WINDOW_HOURS (default 5)
   -> drop items already sent (SQLite, keyed by link hash)
-  -> match tickers via aliases against title + description
+  -> match the first ticker whose alias appears in title + description
   -> group articles by stock, format one message per stock
   -> send to WHATSAPP_GROUP_JID
   -> record sent links
@@ -202,8 +203,8 @@ One message is sent per stock per run. Articles for that stock are separated by 
 ```
 
 Groups larger than 10 articles are split into additional messages for that stock.
-An article matching multiple stocks appears in each stock's message. No emojis,
-plain WhatsApp text. When the RSS item has no description (common on Investing.com),
+An article mentioning several stocks is assigned to the first matching ticker in
+config order. No emojis, plain WhatsApp text. When the RSS item has no description (common on Investing.com),
 the summary block is omitted.
 
 ---

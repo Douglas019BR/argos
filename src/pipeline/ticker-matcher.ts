@@ -32,7 +32,7 @@ export class TickerMatcher {
   }
 
   match(article: Article): Ticker[] {
-    const haystack = normalizeText(`${article.title} ${article.description}`);
+    const haystack = this.haystack(article);
     const matched = new Map<string, Ticker>();
 
     for (const entry of this.aliasEntries) {
@@ -42,5 +42,21 @@ export class TickerMatcher {
     }
 
     return [...matched.values()];
+  }
+
+  matchFirst(article: Article): Ticker | null {
+    const haystack = this.haystack(article);
+
+    for (const entry of this.aliasEntries) {
+      if (entry.pattern.test(haystack)) {
+        return entry.ticker;
+      }
+    }
+
+    return null;
+  }
+
+  private haystack(article: Article): string {
+    return normalizeText(`${article.title} ${article.description}`);
   }
 }
