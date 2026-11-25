@@ -9,7 +9,7 @@ RSS feeds and pushes WhatsApp messages.
 - Matching: accent/case-insensitive aliases with word boundaries (`PETR4`, `Petrobras`, ...).
 - Delivery: one message per stock per run, grouping that stock's articles.
 - No duplicates: sent links are recorded in database.
-- Runs on a configurable cron (every 15 minutes in the current deployment).
+- Runs on a configurable cron (suggested: 08:00, 14:00, 20:00).
 
 ---
 
@@ -27,9 +27,11 @@ load config
   -> record sent links
 ```
 
-A run happens once at startup and then on the cron schedule. Defaults are a 5-hour
-window and a 4-hour cron; the current deployment overrides them to 1 hour and 15
-minutes in `.env`.
+A run happens once at startup and then on the cron schedule. `.env.example`
+suggests three runs a day (08:00, 14:00, 20:00 in `TZ`) with a 9-hour window, so
+each run covers the gap since the previous one; SQLite dedup prevents reposts.
+Use a shorter window and a more frequent cron for fresher but noisier alerts. If
+the variables are omitted, the built-in defaults are 5 hours and `0 */4 * * *`.
 
 ---
 
@@ -50,13 +52,16 @@ Copy `.env.example` to `.env` and fill it in:
 | Variable             | Required | Default             | Meaning                                         |
 | -------------------- | -------- | ------------------- | ----------------------------------------------- |
 | `WHATSAPP_GROUP_JID` | yes      | —                   | Destination group, e.g. `1203630xxxxxxxxx@g.us` |
-| `WINDOW_HOURS`       | no       | `5`                 | Only articles newer than this are sent          |
-| `CRON`               | no       | `0 */4 * * *`       | Run schedule (every 4 hours)                    |
+| `WINDOW_HOURS`       | no       | `9`                 | Only articles newer than this are sent          |
+| `CRON`               | no       | `0 8,14,20 * * *`   | Run schedule (three times a day)                |
 | `DRY_RUN`            | no       | `false`             | `true` logs messages instead of sending         |
 | `DATA_DIR`           | no       | `/data`             | Holds the WhatsApp session and `sent.db`        |
 | `LOG_LEVEL`          | no       | `info`              | `pino` level (`silent`, `info`, `debug`, ...)   |
 | `TZ`                 | no       | `America/Sao_Paulo` | Timezone for the cron schedule                  |
 | `CONFIG_DIR`         | no       | `config`            | Folder holding the YAML files                   |
+
+Values above are the suggestions in `.env.example`. When a variable is absent,
+the built-in defaults are 5 hours and `0 */4 * * *`.
 
 ### `config/tickers.yaml`
 

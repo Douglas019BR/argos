@@ -22,8 +22,8 @@ and push one WhatsApp message per matching article to a group.
 | Ticker list         | Provided by the user (hardcoded config file)                                                  |
 | Language of news    | Portuguese (pt-BR feeds only)                                                                 |
 
-The current deployment overrides the defaults above with `CRON=*/15 * * * *` and
-`WINDOW_HOURS=1`.
+`.env.example` suggests `CRON=0 8,14,20 * * *` and `WINDOW_HOURS=9` to keep volume
+low while covering the gap between runs.
 
 ### Why these two matter
 
